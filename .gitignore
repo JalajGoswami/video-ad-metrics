@@ -1,0 +1,6 @@
+tmp/
+build/
+
+.env
+.*.env
+*.log
