@@ -40,7 +40,7 @@
 - Query Params:
   - `page`: number - default: 1
   - `rows`: number - default: 25 (max: 100)
-  - `sort_by`: `asc` or `desc` - default: `desc` (by created_at)
+  - `order`: `asc` or `desc` - default: `desc` (by created_at)
   - `search`: string - optional (search by name case insensitive)
 - Response:
 
@@ -121,7 +121,7 @@
 
 - Endpoint: `GET /ads/analytics`
 - Query Params:
-  - `range`: `minute`, `hour`, `day`, `week`, `month` - default: `hour`
+  - `period`: `minute`, `hour`, `day`, `week`, `month` - default: `hour`
 - Response:
 
 ```json
@@ -132,9 +132,13 @@
   "result": {
     "total_clicks": 100, // click count so far of all ads
     "average_clicks_per_ad": 10, // average click count per ad
-    "range": "hour", // range of the analytics
-    "total_click_in_range": 40, // click count in the given range (e.g. last hour)
+    "total_playback_time": 1000, // total playback time of all ads
+    "average_playback_time": 10, // average playback time of all ads
+    "period": "hour", // range of the analytics
+    "total_clicks_in_range": 40, // click count in the given range (e.g. last hour)
     "average_clicks_per_ad_in_range": 4, // average clicks per ad in the given range
+    "total_playback_time_in_range": 400, // total playback time of ads in the given range
+    "average_playback_time_per_ad_in_range": 4, // average playback time per ad in the given range
   }
 }
 ```
@@ -143,7 +147,7 @@
 
 - Endpoint: `GET /ads/analytics/:id`
 - Query Params:
-  - `range`: `minute`, `hour`, `day`, `week`, `month` - default: `hour`
+  - `period`: `minute`, `hour`, `day`, `week`, `month` - default: `hour`
 - Response:
 
 ```json
@@ -153,8 +157,12 @@
   "trace_id": "unique-trace-id",
   "result": {
     "total_clicks": 100, // click count so far of this ad
-    "range": "hour", // range of the analytics
-    "total_click_in_range": 40, // click count in the given range (e.g. last hour)
+    "total_playback_time": 1000, // total playback time of this ad
+    "average_playback_time": 10, // average playback time of this ad
+    "period": "hour", // range of the analytics
+    "total_clicks_in_range": 40, // click count in the given range (e.g. last hour)
+    "total_playback_time_in_range": 400, // total playback time of this ad in the given range
+    "average_playback_time_in_range": 4, // average playback time of this ad in the given range
   }
 }
 ```
