@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"time"
 
 	apihelpers "github.com/JalajGoswami/video-ad-metrics/internal/api-helpers"
 	"github.com/JalajGoswami/video-ad-metrics/internal/models"
@@ -23,6 +24,7 @@ type Repository interface {
 	CreateAd(ad *models.Ad) error
 	GetAd(id string) (*models.Ad, error)
 	ListAds(opts ListAdOptions) (*[]models.Ad, error)
+	CountAds(opts ListAdOptions) (int, error)
 
 	// Click operations
 	LogClick(click *models.Click) error
@@ -30,6 +32,7 @@ type Repository interface {
 
 	// Analytics operations
 	GetAdsAnalytics() (*models.AnalyticsData, error)
+	GetAdAnalytics(adID string, rangeDate time.Time) (*models.AdAnalyticsData, error)
 }
 
 type ListAdOptions struct {

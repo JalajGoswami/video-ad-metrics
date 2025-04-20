@@ -1,8 +1,11 @@
 package apihelpers
 
 import (
+	"cmp"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
 )
 
 func SuccessResponse(w http.ResponseWriter, status int, result any, message string) {
@@ -49,4 +52,28 @@ func (s *SortOrderOptions) Default() {
 	if s.Order == "" {
 		s.Order = "desc"
 	}
+}
+
+func Pagination(r *http.Request) (PaginationOptions, func(count int) map[string]int, error) {
+	opts := PaginationOptions{}
+	query := r.URL.Query()
+	page, err := strconv.Atoi(cmp.Or(query.Get("page"), "1"))
+	if err != nil || page < 1 {
+		return opts, nil, errors.New("invalid value for query param `page` provided")
+	}
+	rows, err := strconv.Atoi(cmp.Or(query.Get("rows"), "25"))
+	if err != nil {
+		return opts, nil, errors.New("invalid value for query param `rows` provided")
+	}
+	opts.Limit = rows
+	opts.Offset = (page - 1) * rows
+
+	getPaginationObject := func(count int) map[string]int {
+		totalPages := count / rows
+		if count%rows > 0 {
+			totalPages++
+		}
+		return map[string]int{"page_number": page, "total_pages": totalPages, "page_size": rows}
+	}
+	return opts, getPaginationObject, nil
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/JalajGoswami/video-ad-metrics/internal/database"
 	"github.com/JalajGoswami/video-ad-metrics/internal/handlers"
@@ -37,32 +38,26 @@ func main() {
 		log.Fatalf("Failed to setup database tables: %v", err)
 	}
 
-	// Setup periodic archiving of old clicks (to be done in a real production environment)
-	// For this example, we'll just run it once at startup
-	if err := db.ArchiveOldClicks(); err != nil {
-		log.Printf("Warning: Failed to archive old clicks: %v", err)
-	}
-
-	// In production, you would set up a background job for this
-	// go func() {
-	//     ticker := time.NewTicker(24 * time.Hour)
-	//     defer ticker.Stop()
-	//     for {
-	//         select {
-	//         case <-ticker.C:
-	//             if err := db.ArchiveOldClicks(); err != nil {
-	//                 log.Printf("Failed to archive old clicks: %v", err)
-	//             }
-	//         }
-	//     }
-	// }()
+	// might be done using a cron job in production
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := db.ArchiveOldClicks(); err != nil {
+					log.Printf("Failed to archive old clicks: %v", err)
+				}
+			}
+		}
+	}()
 
 	ctx := context.Background()
 	mux := http.NewServeMux()
 	h := handlers.NewHandler(db)
 
 	// Register routes
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.Method, r.URL)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
@@ -74,10 +69,11 @@ func main() {
 	mux.HandleFunc("GET /api/ads/{id}", h.GetAd)
 
 	// Tracking routes
-	mux.HandleFunc("/api/clicks", h.LogClick)
+	mux.HandleFunc("POST /api/clicks", h.LogClick)
 
 	// Analytics routes
-	mux.HandleFunc("/api/analytics", h.GetAdAnalytics)
+	mux.HandleFunc("GET /api/analytics", h.GetAdsAnalytics)
+	mux.HandleFunc("GET /api/analytics/{id}", h.GetAdAnalytics)
 
 	server := &http.Server{
 		Addr:    ":" + port,

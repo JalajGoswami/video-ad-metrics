@@ -133,8 +133,7 @@ func (p *PostgresDB) ArchiveOldClicks() error {
 	}
 	defer tx.Rollback()
 
-	// Get one month ago date
-	oneMonthAgo := time.Now().AddDate(0, -1, 0)
+	oneMonthAgo := time.Now().AddDate(0, 0, -30)
 
 	// Insert old clicks into archived_clicks table
 	_, err = tx.Exec(`
@@ -217,6 +216,20 @@ func (p *PostgresDB) ListAds(opts ListAdOptions) (*[]models.Ad, error) {
 	return &ads, nil
 }
 
+// used for pagination
+func (p *PostgresDB) CountAds(opts ListAdOptions) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM ads`
+	if opts.Search != "" {
+		query += ` WHERE name ILIKE '%' || $1 || '%'`
+	}
+	err := p.db.Get(&count, query, opts.Search)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count ads: %w", err)
+	}
+	return count, nil
+}
+
 // LogClick records a click and updates analytics
 func (p *PostgresDB) LogClick(click *models.Click) error {
 	tx, err := p.db.Beginx()
@@ -264,82 +277,49 @@ func (p *PostgresDB) LogClick(click *models.Click) error {
 }
 
 // GetAdAnalytics retrieves analytics for a specific ad
-func (p *PostgresDB) GetAdAnalytics(adID string, startDate, endDate time.Time) (*models.AnalyticsData, error) {
+func (p *PostgresDB) GetAdAnalytics(adID string, rangeDate time.Time) (*models.AdAnalyticsData, error) {
 	// Check if ad exists
 	var exists bool
 	err := p.db.Get(&exists, `SELECT EXISTS(SELECT 1 FROM ads WHERE id = $1)`, adID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if ad exists: %w", err)
 	}
-
 	if !exists {
 		return nil, ErrNotFound
 	}
 
-	// If startDate and endDate are close to month boundaries, try to use monthly analytics
-	// Otherwise, calculate from clicks directly
-	startMonth := startDate.Month()
-	startYear := startDate.Year()
-	endMonth := endDate.Month()
-	endYear := endDate.Year()
-
-	// Check if we're looking for a specific month
-	if startMonth == endMonth && startYear == endYear &&
-		startDate.Day() <= 3 && endDate.Day() >= 27 {
-
-		// Try to get monthly analytics
-		var monthlyData models.MonthlyAnalytics
-		err := p.db.Get(&monthlyData, `
-			SELECT * FROM monthly_analytics
-			WHERE ad_id = $1 AND month = $2 AND year = $3
-		`, adID, int(startMonth), startYear)
-
-		if err == nil {
-			// We found monthly data
-			return &models.AnalyticsData{
-				AdID:                adID,
-				TotalClicks:         monthlyData.TotalClicks,
-				TotalPlaybackTime:   monthlyData.TotalPlaybackTime,
-				AveragePlaybackTime: float64(monthlyData.TotalPlaybackTime) / float64(monthlyData.TotalClicks),
-				Period:              "monthly",
-			}, nil
-		}
+	var aggregatedResult models.AggregatedAnalytics
+	err = p.db.Get(&aggregatedResult, `SELECT * FROM aggregated_analytics WHERE ad_id = $1`, adID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get aggregated analytics: %w", err)
 	}
 
-	// If no monthly data or custom date range, calculate from clicks
-	var result struct {
+	var rangeResult struct {
 		TotalClicks       int `db:"total_clicks"`
 		TotalPlaybackTime int `db:"total_playback_time"`
 	}
 
 	// Query combines current and archived clicks
-	err = p.db.Get(&result, `
+	err = p.db.Get(&rangeResult, `
 		SELECT 
 			COUNT(*) as total_clicks,
 			COALESCE(SUM(playback_time), 0) as total_playback_time
 		FROM (
 			SELECT playback_time FROM clicks
-			WHERE ad_id = $1 AND timestamp >= $2 AND timestamp <= $3
-			UNION ALL
-			SELECT playback_time FROM archived_clicks
-			WHERE ad_id = $1 AND timestamp >= $2 AND timestamp <= $3
-		) AS combined_clicks
-	`, adID, startDate, endDate)
+			WHERE ad_id = $1 AND timestamp >= $2
+		)
+	`, adID, rangeDate)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get analytics: %w", err)
+		return nil, fmt.Errorf("failed to get range analytics: %w", err)
 	}
 
-	averagePlaybackTime := float64(0)
-	if result.TotalClicks > 0 {
-		averagePlaybackTime = float64(result.TotalPlaybackTime) / float64(result.TotalClicks)
-	}
-
-	return &models.AnalyticsData{
-		AdID:                adID,
-		TotalClicks:         result.TotalClicks,
-		TotalPlaybackTime:   result.TotalPlaybackTime,
-		AveragePlaybackTime: averagePlaybackTime,
-		Period:              "custom",
+	return &models.AdAnalyticsData{
+		AdID:                     adID,
+		TotalClicks:              aggregatedResult.TotalClicks,
+		TotalPlaybackTime:        aggregatedResult.TotalPlaybackTime,
+		Period:                   "", // will be set in the handler
+		TotalClicksInRange:       rangeResult.TotalClicks,
+		TotalPlaybackTimeInRange: rangeResult.TotalPlaybackTime,
 	}, nil
 }

@@ -36,7 +36,7 @@
   "created_at": "2025-01-01T00:00:00Z",
 }
 ```
-> Note: `clicks` table will only store clicks for the current month. Older data will be archived routinely thus reducing latency for analytics queries.
+> Note: `clicks` table will only store clicks of the last 30 days. Older data will be archived routinely thus reducing latency for analytics queries.
 
 - Table `archived_clicks`
 
@@ -46,7 +46,7 @@
 }
 ```
 
-> Note: Entries in `clicks` table will be moved to `archived_clicks` table after each month.
+> Note: Entries in `clicks` table will be moved to `archived_clicks` table every day which are older than one month.
 
 ### Aggregated Analytics
 
