@@ -182,3 +182,36 @@ func (h *Handler) GetAdAnalytics(w http.ResponseWriter, r *http.Request) {
 
 	apihelpers.SuccessResponse(w, http.StatusOK, analytics, "")
 }
+
+// GetAdsAnalytics retrieves analytics for all ads
+func (h *Handler) GetAdsAnalytics(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	period := query.Get("period")
+	if period == "" {
+		period = "hour"
+	} else if !slices.Contains([]string{"minute", "hour", "day", "week", "month"}, period) {
+		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid period")
+		return
+	}
+
+	startDate := time.Now().AddDate(0, -1, 0) // for month period
+	if period != "month" {
+		startDate = time.Now().Add(-durationMap[period])
+	}
+
+	analytics, err := h.DB.GetAdsAnalytics(startDate)
+	if err != nil {
+		apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving analytics")
+		return
+	}
+
+	analytics.Period = period
+	if analytics.TotalClicks > 0 {
+		analytics.AveragePlaybackTime = float64(analytics.TotalPlaybackTime) / float64(analytics.TotalClicks)
+	}
+	if analytics.TotalClicksInRange > 0 {
+		analytics.AveragePlaybackTimeInRange = float64(analytics.TotalPlaybackTimeInRange) / float64(analytics.TotalClicksInRange)
+	}
+
+	apihelpers.SuccessResponse(w, http.StatusOK, analytics, "")
+}

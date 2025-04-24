@@ -31,8 +31,8 @@ type Repository interface {
 	ArchiveOldClicks() error
 
 	// Analytics operations
-	GetAdsAnalytics() (*models.AnalyticsData, error)
 	GetAdAnalytics(adID string, rangeDate time.Time) (*models.AdAnalyticsData, error)
+	GetAdsAnalytics(rangeDate time.Time) (*models.AnalyticsData, error)
 }
 
 type ListAdOptions struct {

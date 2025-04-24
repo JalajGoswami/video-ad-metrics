@@ -3,12 +3,13 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/JalajGoswami/video-ad-metrics/internal/models"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 // PostgresDB implements the Repository interface using PostgreSQL
@@ -20,7 +21,19 @@ type PostgresDB struct {
 func NewPostgresDB(connString string) (*PostgresDB, error) {
 	db, err := sqlx.Connect("postgres", connString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+		pqErr, ok := err.(*pq.Error)
+		if ok && pqErr.Code == "3D000" {
+			err = createDatabase(connString)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create database: %w", err)
+			}
+			db, err = sqlx.Connect("postgres", connString)
+			if err != nil {
+				return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+		}
 	}
 
 	db.SetMaxOpenConns(25)
@@ -30,6 +43,29 @@ func NewPostgresDB(connString string) (*PostgresDB, error) {
 	return &PostgresDB{
 		db: db,
 	}, nil
+}
+
+func createDatabase(connString string) error {
+	dbUrl, err := url.Parse(connString)
+	if err != nil {
+		return fmt.Errorf("failed to parse database URL: %w", err)
+	}
+	dbName := dbUrl.Path[1:]
+	dbUrl.Path = "/postgres"
+	connString = dbUrl.String()
+	db, err := sqlx.Connect("postgres", connString)
+	if err != nil {
+		return fmt.Errorf("failed to connect to postgres: %w", err)
+	}
+	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s`, pq.QuoteIdentifier(dbName)))
+	if err != nil {
+		return fmt.Errorf("failed to create database: %w", err)
+	}
+	err = db.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close database: %w", err)
+	}
+	return nil
 }
 
 func (p *PostgresDB) Close() error {
@@ -288,22 +324,17 @@ func (p *PostgresDB) GetAdAnalytics(adID string, rangeDate time.Time) (*models.A
 		return nil, ErrNotFound
 	}
 
-	var aggregatedResult models.AggregatedAnalytics
-	err = p.db.Get(&aggregatedResult, `SELECT * FROM aggregated_analytics WHERE ad_id = $1`, adID)
+	var result models.AdAnalyticsData
+	err = p.db.Get(&result, `SELECT * FROM aggregated_analytics WHERE ad_id = $1`, adID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aggregated analytics: %w", err)
 	}
 
-	var rangeResult struct {
-		TotalClicks       int `db:"total_clicks"`
-		TotalPlaybackTime int `db:"total_playback_time"`
-	}
-
 	// Query combines current and archived clicks
-	err = p.db.Get(&rangeResult, `
+	err = p.db.Get(&result, `
 		SELECT 
-			COUNT(*) as total_clicks,
-			COALESCE(SUM(playback_time), 0) as total_playback_time
+			COUNT(*) as total_clicks_in_range,
+			COALESCE(SUM(playback_time), 0) as total_playback_time_in_range
 		FROM (
 			SELECT playback_time FROM clicks
 			WHERE ad_id = $1 AND timestamp >= $2
@@ -314,12 +345,47 @@ func (p *PostgresDB) GetAdAnalytics(adID string, rangeDate time.Time) (*models.A
 		return nil, fmt.Errorf("failed to get range analytics: %w", err)
 	}
 
-	return &models.AdAnalyticsData{
-		AdID:                     adID,
-		TotalClicks:              aggregatedResult.TotalClicks,
-		TotalPlaybackTime:        aggregatedResult.TotalPlaybackTime,
-		Period:                   "", // will be set in the handler
-		TotalClicksInRange:       rangeResult.TotalClicks,
-		TotalPlaybackTimeInRange: rangeResult.TotalPlaybackTime,
-	}, nil
+	return &result, nil
+}
+
+// GetAdsAnalytics retrieves aggregate analytics for all ads
+func (p *PostgresDB) GetAdsAnalytics(rangeDate time.Time) (*models.AnalyticsData, error) {
+	var result struct {
+		models.AnalyticsData
+		AdCount int `db:"ad_count"`
+	}
+
+	err := p.db.Get(&result, `
+		SELECT 
+			SUM(total_clicks) AS total_clicks,
+			SUM(total_playback_time) AS total_playback_time,
+			COUNT(*) AS ad_count
+		FROM aggregated_analytics
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get aggregated analytics: %w", err)
+	}
+
+	if result.AdCount > 0 {
+		result.AverageClicksPerAd = float64(result.TotalClicks) / float64(result.AdCount)
+	}
+
+	err = p.db.Get(&result, `
+		SELECT 
+			COUNT(*) AS total_clicks_in_range,
+			COALESCE(SUM(playback_time), 0) AS total_playback_time_in_range,
+			COUNT(DISTINCT ad_id) AS ad_count
+		FROM clicks
+		WHERE timestamp >= $1
+	`, rangeDate)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get today's analytics: %w", err)
+	}
+
+	if result.AdCount > 0 {
+		result.AverageClicksPerAdInRange = float64(result.TotalClicksInRange) / float64(result.AdCount)
+	}
+
+	return &result.AnalyticsData, nil
 }

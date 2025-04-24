@@ -138,7 +138,7 @@
     "total_clicks_in_range": 40, // click count in the given range (e.g. last hour)
     "average_clicks_per_ad_in_range": 4, // average clicks per ad in the given range
     "total_playback_time_in_range": 400, // total playback time of ads in the given range
-    "average_playback_time_per_ad_in_range": 4, // average playback time per ad in the given range
+    "average_playback_time_in_range": 4, // average playback time per click in the given range
   }
 }
 ```
@@ -162,7 +162,7 @@
     "period": "hour", // range of the analytics
     "total_clicks_in_range": 40, // click count in the given range (e.g. last hour)
     "total_playback_time_in_range": 400, // total playback time of this ad in the given range
-    "average_playback_time_in_range": 4, // average playback time of this ad in the given range
+    "average_playback_time_in_range": 4, // average playback time per click of this ad in the given range
   }
 }
 ```

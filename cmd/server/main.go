@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"log"
@@ -15,19 +16,14 @@ import (
 )
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "5000"
-	}
-
-	// Get postgres connection string from environment variable or use default
-	pgConnString := os.Getenv("DATABASE_URL")
-	if pgConnString == "" {
-		pgConnString = "postgres://postgres:postgres@localhost:5432/video_ad_metrics?sslmode=disable"
-	}
+	port := cmp.Or(os.Getenv("PORT"), "5000")
+	dbUrl := cmp.Or(
+		os.Getenv("DATABASE_URL"),
+		"postgres://postgres:postgres@postgres:5432/video-ad-metrics?sslmode=disable",
+	)
 
 	// Initialize database connection
-	db, err := database.NewPostgresDB(pgConnString)
+	db, err := database.NewPostgresDB(dbUrl)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}

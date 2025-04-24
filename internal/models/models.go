@@ -57,16 +57,16 @@ type MonthlyAnalytics struct {
 
 // AnalyticsData represents the response format for analytics API
 type AnalyticsData struct {
-	AdID                            string  `json:"ad_id"`
-	TotalClicks                     int     `json:"total_clicks"`
-	AverageClicksPerAd              float64 `json:"average_clicks_per_ad"`
-	TotalPlaybackTime               int     `json:"total_playback_time"`
-	AveragePlaybackTime             float64 `json:"average_playback_time"`
-	Period                          string  `json:"period"` // minute, hour, day, week, month
-	TotalClicksInRange              int     `json:"total_clicks_in_range"`
-	AverageClicksPerAdInRange       float64 `json:"average_clicks_per_ad_in_range"`
-	TotalPlaybackTimeInRange        int     `json:"total_playback_time_in_range"`
-	AveragePlaybackTimePerAdInRange float64 `json:"average_playback_time_per_ad_in_range"`
+	AdID                       string  `json:"ad_id"`
+	TotalClicks                int     `json:"total_clicks"`
+	AverageClicksPerAd         float64 `json:"average_clicks_per_ad"`
+	TotalPlaybackTime          int     `json:"total_playback_time"`
+	AveragePlaybackTime        float64 `json:"average_playback_time"`
+	Period                     string  `json:"period"` // minute, hour, day, week, month
+	TotalClicksInRange         int     `json:"total_clicks_in_range"`
+	AverageClicksPerAdInRange  float64 `json:"average_clicks_per_ad_in_range"`
+	TotalPlaybackTimeInRange   int     `json:"total_playback_time_in_range"`
+	AveragePlaybackTimeInRange float64 `json:"average_playback_time_in_range"`
 }
 
 // AdAnalyticsData represents the response format for ad analytics API
