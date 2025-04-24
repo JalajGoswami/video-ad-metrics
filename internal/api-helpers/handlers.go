@@ -54,7 +54,7 @@ func (s *SortOrderOptions) Default() {
 	}
 }
 
-func Pagination(r *http.Request) (PaginationOptions, func(count int) map[string]int, error) {
+func Pagination(r *http.Request) (PaginationOptions, func(count int, total int) map[string]int, error) {
 	opts := PaginationOptions{}
 	query := r.URL.Query()
 	page, err := strconv.Atoi(cmp.Or(query.Get("page"), "1"))
@@ -68,12 +68,12 @@ func Pagination(r *http.Request) (PaginationOptions, func(count int) map[string]
 	opts.Limit = rows
 	opts.Offset = (page - 1) * rows
 
-	getPaginationObject := func(count int) map[string]int {
-		totalPages := count / rows
-		if count%rows > 0 {
+	getPaginationObject := func(count int, total int) map[string]int {
+		totalPages := total / rows
+		if total%rows > 0 {
 			totalPages++
 		}
-		return map[string]int{"page_number": page, "total_pages": totalPages, "page_size": rows}
+		return map[string]int{"page_number": page, "total_pages": totalPages, "total_rows": count, "page_size": rows}
 	}
 	return opts, getPaginationObject, nil
 }

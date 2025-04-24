@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Build artifacts
+bin/
+obj/
+tmp/
+
+# Dependency directories
+vendor/
+
+# Log files
+*.log
+
+# Local development files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Editor and OS specific files
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# Database volume
+postgres-data/ 

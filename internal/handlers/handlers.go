@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"time"
@@ -83,15 +84,16 @@ func (h *Handler) ListAds(w http.ResponseWriter, r *http.Request) {
 		apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving ads")
 		return
 	}
-	count, err := h.DB.CountAds(opts)
+	totalCount, err := h.DB.CountAds(opts)
 	if err != nil {
 		apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving ads count")
+		fmt.Println(err)
 		return
 	}
 
 	result := map[string]any{
 		"values": ads,
-		"pages":  getPaginationObject(count),
+		"pages":  getPaginationObject(len(*ads), totalCount),
 	}
 	apihelpers.SuccessResponse(w, http.StatusOK, result, "")
 }
@@ -100,6 +102,7 @@ func (h *Handler) ListAds(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) LogClick(w http.ResponseWriter, r *http.Request) {
 	var click models.Click
 	if err := json.NewDecoder(r.Body).Decode(&click); err != nil {
+		fmt.Println(err)
 		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -168,6 +171,7 @@ func (h *Handler) GetAdAnalytics(w http.ResponseWriter, r *http.Request) {
 			apihelpers.ErrorResponse(w, http.StatusNotFound, "Ad not found")
 		} else {
 			apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving analytics")
+			fmt.Println(err)
 		}
 		return
 	}

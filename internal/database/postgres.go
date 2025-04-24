@@ -237,15 +237,19 @@ func (p *PostgresDB) ListAds(opts ListAdOptions) (*[]models.Ad, error) {
 	ads := []models.Ad{}
 	query := `SELECT * FROM ads`
 	if opts.Search != "" {
-		query += ` WHERE name ILIKE '%' || $1 || '%'`
+		query += ` WHERE name ILIKE '%' || :search || '%'`
 	}
-	query += ` LIMIT $2 OFFSET $3`
 	if opts.Order == "asc" {
-		query += ` ORDER BY created_at ASC`
+		query += ` ORDER BY "created_at" ASC`
 	} else {
-		query += ` ORDER BY created_at DESC`
+		query += ` ORDER BY "created_at" DESC`
 	}
-	err := p.db.Select(&ads, query, opts.Search, opts.Limit, opts.Offset)
+	query += ` LIMIT :limit OFFSET :offset;`
+	stmt, err := p.db.PrepareNamed(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	err = stmt.Select(&ads, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list ads: %w", err)
 	}
@@ -255,11 +259,14 @@ func (p *PostgresDB) ListAds(opts ListAdOptions) (*[]models.Ad, error) {
 // used for pagination
 func (p *PostgresDB) CountAds(opts ListAdOptions) (int, error) {
 	var count int
+	var err error
 	query := `SELECT COUNT(*) FROM ads`
 	if opts.Search != "" {
 		query += ` WHERE name ILIKE '%' || $1 || '%'`
+		err = p.db.Get(&count, query, opts.Search)
+	} else {
+		err = p.db.Get(&count, query)
 	}
-	err := p.db.Get(&count, query, opts.Search)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count ads: %w", err)
 	}
@@ -325,7 +332,7 @@ func (p *PostgresDB) GetAdAnalytics(adID string, rangeDate time.Time) (*models.A
 	}
 
 	var result models.AdAnalyticsData
-	err = p.db.Get(&result, `SELECT * FROM aggregated_analytics WHERE ad_id = $1`, adID)
+	err = p.db.Get(&result, `SELECT ad_id, total_clicks, total_playback_time FROM aggregated_analytics WHERE ad_id = $1`, adID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get aggregated analytics: %w", err)
 	}

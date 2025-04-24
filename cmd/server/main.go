@@ -21,7 +21,6 @@ func main() {
 		os.Getenv("DATABASE_URL"),
 		"postgres://postgres:postgres@postgres:5432/video-ad-metrics?sslmode=disable",
 	)
-
 	// Initialize database connection
 	db, err := database.NewPostgresDB(dbUrl)
 	if err != nil {
@@ -60,20 +59,23 @@ func main() {
 	})
 
 	// Ad management routes
-	mux.HandleFunc("GET /api/ads", h.ListAds)
-	mux.HandleFunc("POST /api/ads", h.CreateAd)
-	mux.HandleFunc("GET /api/ads/{id}", h.GetAd)
+	mux.HandleFunc("GET /ads", h.ListAds)
+	mux.HandleFunc("POST /ads", h.CreateAd)
+	mux.HandleFunc("GET /ads/{id}", h.GetAd)
 
 	// Tracking routes
-	mux.HandleFunc("POST /api/clicks", h.LogClick)
+	mux.HandleFunc("POST /ads/clicks", h.LogClick)
 
 	// Analytics routes
-	mux.HandleFunc("GET /api/analytics", h.GetAdsAnalytics)
-	mux.HandleFunc("GET /api/analytics/{id}", h.GetAdAnalytics)
+	mux.HandleFunc("GET /ads/analytics", h.GetAdsAnalytics)
+	mux.HandleFunc("GET /ads/analytics/{id}", h.GetAdAnalytics)
 
 	server := &http.Server{
-		Addr:    ":" + port,
-		Handler: mux,
+		Addr: ":" + port,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Println(r.Method, r.URL.String())
+			mux.ServeHTTP(w, r)
+		}),
 	}
 
 	// Start server in a separate goroutine
