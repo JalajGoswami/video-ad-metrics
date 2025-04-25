@@ -68,6 +68,10 @@ func createDatabase(connString string) error {
 	return nil
 }
 
+func (p *PostgresDB) Ping() error {
+	return p.db.Ping()
+}
+
 func (p *PostgresDB) Close() error {
 	return p.db.Close()
 }

@@ -18,6 +18,7 @@ var (
 type Repository interface {
 	// Config operations
 	Setup() error
+	Ping() error
 	Close() error
 
 	// Ad operations

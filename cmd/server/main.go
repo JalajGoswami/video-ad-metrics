@@ -13,13 +13,19 @@ import (
 
 	"github.com/JalajGoswami/video-ad-metrics/internal/database"
 	"github.com/JalajGoswami/video-ad-metrics/internal/handlers"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
 	port := cmp.Or(os.Getenv("PORT"), "5000")
 	dbUrl := cmp.Or(
 		os.Getenv("DATABASE_URL"),
-		"postgres://postgres:postgres@postgres:5432/video-ad-metrics?sslmode=disable",
+		"postgres://postgres:postgres@postgres:5432/video_ad_metrics?sslmode=disable",
 	)
 	// Initialize database connection
 	db, err := database.NewPostgresDB(dbUrl)
@@ -53,9 +59,14 @@ func main() {
 
 	// Register routes
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		log.Println(r.Method, r.URL)
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if db.Ping() != nil {
+			log.Printf("Database connection failed: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Database connection failed"))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		}
 	})
 
 	// Ad management routes

@@ -30,7 +30,7 @@ services:
         condition: service_healthy
     networks:
       - app-network
-    # restart: unless-stopped
+    # restart: unless-stopped # Commenting during development
 
 volumes:
   postgres-data:

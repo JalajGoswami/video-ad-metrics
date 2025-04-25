@@ -17,16 +17,16 @@ This is a Go based service that allows you to manage video ads and track their p
 git clone https://github.com/JalajGoswami/video-ad-metrics.git
 ```
 
-2. Build Docker Image
+2. Build Docker Images
 
 ```bash
-docker build -t video-ad-metrics .
+docker compose build
 ```
 
-3. Run Docker Container
+3. Run Docker Containers (Postgres and Service)
 
 ```bash
-docker run -d -p 5000:5000 video-ad-metrics
+docker compose up -d
 ```
 
 4. Test the service
@@ -42,6 +42,7 @@ curl -X GET http://localhost:5000/health
 - Git
 - Go
 - Postgres
+- Air (for hot reloading)
 
 ### Instructions
 
@@ -51,30 +52,43 @@ curl -X GET http://localhost:5000/health
 git clone https://github.com/JalajGoswami/video-ad-metrics.git
 ```
 
-2. Create a Postgres database (first time only)
-
-```bash
-make create-db
-# creates a new database with mock data
-# skip this step if database already exists as it will drop the existing database
-```
-
-3. Install Dependencies
+2. Install Dependencies
 
 ```bash
 go mod tidy
 ```
 
-4. Run the service (in dev mode)
+3. Install Air
 
 ```bash
-make run
+go install github.com/air-verse/air@latest
 ```
 
-5. Test the service
+4. Run postgres database
 
 ```bash
-make test
+docker compose up -d postgres
+```
+
+5. Create a Postgres database (first time only)
+
+```bash
+go run cmd/create-db/main.go
+# creates a new database with mock data
+# skip this step if database already exists as it will drop the existing database
+```
+
+
+6. Run the service (in dev mode)
+
+```bash
+air
+```
+
+7. Test the service
+
+```bash
+curl -X GET http://localhost:5000/health
 ```
 
 ## API Documentation

@@ -37,7 +37,7 @@ type ArchivedClick struct {
 // AggregatedAnalytics represents precomputed analytics for ads
 type AggregatedAnalytics struct {
 	ID                string    `json:"id" db:"id"`
-	AdID              string    `json:"adId" db:"ad_id"`
+	AdID              string    `json:"ad_id" db:"ad_id"`
 	TotalClicks       int       `json:"total_clicks" db:"total_clicks"`
 	TotalPlaybackTime int       `json:"total_playback_time" db:"total_playback_time"`
 	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
@@ -47,7 +47,7 @@ type AggregatedAnalytics struct {
 // MonthlyAnalytics represents analytics for ads broken down by month
 type MonthlyAnalytics struct {
 	ID                string    `json:"id" db:"id"`
-	AdID              string    `json:"adId" db:"ad_id"`
+	AdID              string    `json:"ad_id" db:"ad_id"`
 	Month             int       `json:"month" db:"month"`
 	Year              int       `json:"year" db:"year"`
 	TotalClicks       int       `json:"total_clicks" db:"total_clicks"`
