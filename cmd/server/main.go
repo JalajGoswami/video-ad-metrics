@@ -14,6 +14,7 @@ import (
 	"github.com/JalajGoswami/video-ad-metrics/internal/database"
 	"github.com/JalajGoswami/video-ad-metrics/internal/handlers"
 	"github.com/JalajGoswami/video-ad-metrics/internal/logger"
+	"github.com/JalajGoswami/video-ad-metrics/internal/monitoring"
 	"github.com/joho/godotenv"
 )
 
@@ -39,7 +40,7 @@ func main() {
 		logger.FatalLog("Failed to setup database tables: %v", err)
 	}
 
-	// might be done using a cron job in production
+	// might be done using a cron job or pg_cron in production calling a procedure of postgres
 	go func() {
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
@@ -69,6 +70,9 @@ func main() {
 		}
 	})
 
+	// Prometheus metrics endpoint
+	mux.Handle("GET /metrics", monitoring.MetricsHandler())
+
 	// Ad management routes
 	mux.HandleFunc("GET /ads", h.ListAds)
 	mux.HandleFunc("POST /ads", h.CreateAd)
@@ -81,8 +85,10 @@ func main() {
 	mux.HandleFunc("GET /ads/analytics", h.GetAdsAnalytics)
 	mux.HandleFunc("GET /ads/analytics/{id}", h.GetAdAnalytics)
 
+	// Apply middlewares
 	handler := logger.RequestLogger.LoggingMiddleware(mux)
 	handler = apihelpers.TraceMiddleware(handler)
+	handler = monitoring.PrometheusMiddleware(handler)
 
 	server := &http.Server{
 		Addr:    ":" + port,
@@ -91,7 +97,8 @@ func main() {
 
 	// Start server in a separate goroutine
 	go func() {
-		logger.LogColored(logger.ColorGreen, "⚡ Server listening on http://localhost:%s\n", port)
+		logger.LogColored(logger.ColorGreen, "\n⚡ Server listening on http://localhost:%s", port)
+		logger.LogColored(logger.ColorBlue, "\nPrometheus metrics available at http://localhost:%s/metrics\n", port)
 		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.FatalLog("Server failed to start: %v", err)

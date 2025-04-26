@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/JalajGoswami/video-ad-metrics/internal/models"
+	"github.com/JalajGoswami/video-ad-metrics/internal/monitoring"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -17,16 +18,19 @@ type PostgresDB struct {
 	db *sqlx.DB
 }
 
-// NewPostgresDB creates a new PostgreSQL repository
+// NewPostgresDB creates a new PostgresDB repository
 func NewPostgresDB(connString string) (*PostgresDB, error) {
 	db, err := sqlx.Connect("postgres", connString)
 	if err != nil {
 		pqErr, ok := err.(*pq.Error)
 		if ok && pqErr.Code == "3D000" {
+			// Database doesn't exist, try to create it
 			err = createDatabase(connString)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create database: %w", err)
 			}
+
+			// Try to connect again after creating the database
 			db, err = sqlx.Connect("postgres", connString)
 			if err != nil {
 				return nil, fmt.Errorf("failed to connect to postgres: %w", err)
@@ -36,13 +40,24 @@ func NewPostgresDB(connString string) (*PostgresDB, error) {
 		}
 	}
 
+	// Configure connection pool
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	return &PostgresDB{
-		db: db,
-	}, nil
+	// Track connections for monitoring
+	monitoring.SetDatabaseConnections(db.Stats().OpenConnections)
+
+	// Start a goroutine to periodically update connection metrics
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			monitoring.SetDatabaseConnections(db.Stats().OpenConnections)
+		}
+	}()
+
+	return &PostgresDB{db: db}, nil
 }
 
 func createDatabase(connString string) error {
@@ -319,6 +334,9 @@ func (p *PostgresDB) LogClick(click *models.Click) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+
+	// Track the click in metrics
+	monitoring.IncrementClicksLogged()
 
 	return nil
 }
