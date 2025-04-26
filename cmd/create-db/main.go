@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/JalajGoswami/video-ad-metrics/internal/database"
+	"github.com/JalajGoswami/video-ad-metrics/internal/logger"
 	"github.com/JalajGoswami/video-ad-metrics/internal/models"
 )
 
@@ -31,30 +31,30 @@ func main() {
 
 	dbUrl, err := url.Parse(connString)
 	if err != nil {
-		log.Fatalf("failed to parse database URL: %v", err)
+		logger.FatalLog("failed to parse database URL: %v", err)
 	}
 	dbName := dbUrl.Path[1:]
 	dbUrl.Path = "/postgres"
 	connString = dbUrl.String()
 	db, err := sqlx.Connect("postgres", connString)
 	if err != nil {
-		log.Fatalf("Error connecting to PostgreSQL: %v", err)
+		logger.FatalLog("Error connecting to PostgreSQL: %v", err)
 	}
 
-	fmt.Println("Successfully connected to PostgreSQL")
+	logger.InfoLog("Successfully connected to PostgreSQL")
 
 	_, err = db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s", dbName))
 	if err != nil {
-		log.Fatalf("Error dropping database: %v", err)
+		logger.FatalLog("Error dropping database: %v", err)
 	}
-	fmt.Printf("Dropped database %s if it existed\n", dbName)
+	logger.InfoLog("Dropped database %s if it existed", dbName)
 
 	// Create database
 	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s", dbName))
 	if err != nil {
-		log.Fatalf("Error creating database: %v", err)
+		logger.FatalLog("Error creating database: %v", err)
 	}
-	fmt.Printf("Created database %s\n", dbName)
+	logger.InfoLog("Created database %s", dbName)
 
 	db.Close()
 
@@ -63,11 +63,11 @@ func main() {
 	connString = dbUrl.String()
 	db, err = sqlx.Connect("postgres", connString)
 	if err != nil {
-		log.Fatalf("Error connecting to %s database: %v", dbName, err)
+		logger.FatalLog("Error connecting to %s database: %v", dbName, err)
 	}
 	defer db.Close()
 
-	fmt.Printf("Successfully connected to %s database\n", dbName)
+	logger.InfoLog("Successfully connected to %s database", dbName)
 
 	// Create tables
 	createTables(connString)
@@ -75,23 +75,23 @@ func main() {
 	// Load mock data
 	mockData, err := loadMockData()
 	if err != nil {
-		log.Fatalf("Error loading mock data: %v", err)
+		logger.FatalLog("Error loading mock data: %v", err)
 	}
 
 	// Insert mock data
 	insertMockData(db, mockData)
 
-	fmt.Println("Database setup completed successfully!")
+	logger.InfoLog("Database setup completed successfully!")
 }
 
 func createTables(dbUrl string) {
 	pgDb, err := database.NewPostgresDB(dbUrl)
 	if err != nil {
-		log.Fatalf("Error connecting to new DB: %v", err)
+		logger.FatalLog("Error connecting to new DB: %v", err)
 	}
 	err = pgDb.Setup()
 	if err != nil {
-		log.Fatalf("Error creating tables: %v", err)
+		logger.FatalLog("Error creating tables: %v", err)
 	}
 }
 
@@ -132,10 +132,10 @@ func insertMockData(db *sqlx.DB, mockData MockData) {
 		`, ad)
 
 		if err != nil {
-			log.Fatalf("Error inserting ad %s: %v", ad.ID, err)
+			logger.FatalLog("Error inserting ad %s: %v", ad.ID, err)
 		}
 	}
-	fmt.Printf("Inserted %d ads\n", len(mockData.Ads))
+	logger.InfoLog("Inserted %d ads", len(mockData.Ads))
 
 	// Insert clicks
 	for _, click := range mockData.Clicks {
@@ -145,10 +145,10 @@ func insertMockData(db *sqlx.DB, mockData MockData) {
 		`, click)
 
 		if err != nil {
-			log.Fatalf("Error inserting click %s: %v", click.ID, err)
+			logger.FatalLog("Error inserting click %s: %v", click.ID, err)
 		}
 	}
-	fmt.Printf("Inserted %d clicks\n", len(mockData.Clicks))
+	logger.InfoLog("Inserted %d clicks", len(mockData.Clicks))
 
 	// Insert archived clicks
 	for _, click := range mockData.ArchivedClicks {
@@ -158,10 +158,10 @@ func insertMockData(db *sqlx.DB, mockData MockData) {
 		`, click)
 
 		if err != nil {
-			log.Fatalf("Error inserting archived click %s: %v", click.ID, err)
+			logger.FatalLog("Error inserting archived click %s: %v", click.ID, err)
 		}
 	}
-	fmt.Printf("Inserted %d archived clicks\n", len(mockData.ArchivedClicks))
+	logger.InfoLog("Inserted %d archived clicks", len(mockData.ArchivedClicks))
 
 	// Insert aggregated analytics
 	for _, analytics := range mockData.AggregatedAnalytics {
@@ -171,10 +171,10 @@ func insertMockData(db *sqlx.DB, mockData MockData) {
 		`, analytics)
 
 		if err != nil {
-			log.Fatalf("Error inserting aggregated analytics %s: %v", analytics.ID, err)
+			logger.FatalLog("Error inserting aggregated analytics %s: %v", analytics.ID, err)
 		}
 	}
-	fmt.Printf("Inserted %d aggregated analytics\n", len(mockData.AggregatedAnalytics))
+	logger.InfoLog("Inserted %d aggregated analytics", len(mockData.AggregatedAnalytics))
 
 	// Insert monthly analytics
 	for _, analytics := range mockData.MonthlyAnalytics {
@@ -184,8 +184,8 @@ func insertMockData(db *sqlx.DB, mockData MockData) {
 		`, analytics)
 
 		if err != nil {
-			log.Fatalf("Error inserting monthly analytics %s: %v", analytics.ID, err)
+			logger.FatalLog("Error inserting monthly analytics %s: %v", analytics.ID, err)
 		}
 	}
-	fmt.Printf("Inserted %d monthly analytics\n", len(mockData.MonthlyAnalytics))
+	logger.InfoLog("Inserted %d monthly analytics", len(mockData.MonthlyAnalytics))
 }

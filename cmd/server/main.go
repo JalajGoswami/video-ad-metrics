@@ -4,23 +4,21 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	apihelpers "github.com/JalajGoswami/video-ad-metrics/internal/api-helpers"
 	"github.com/JalajGoswami/video-ad-metrics/internal/database"
 	"github.com/JalajGoswami/video-ad-metrics/internal/handlers"
+	"github.com/JalajGoswami/video-ad-metrics/internal/logger"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
+	godotenv.Load()
 
 	port := cmp.Or(os.Getenv("PORT"), "5000")
 	dbUrl := cmp.Or(
@@ -30,13 +28,15 @@ func main() {
 	// Initialize database connection
 	db, err := database.NewPostgresDB(dbUrl)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.FatalLog("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
+	logger.SetupRequestLogger()
+
 	// Setup database tables
 	if err := db.Setup(); err != nil {
-		log.Fatalf("Failed to setup database tables: %v", err)
+		logger.FatalLog("Failed to setup database tables: %v", err)
 	}
 
 	// might be done using a cron job in production
@@ -47,7 +47,7 @@ func main() {
 			select {
 			case <-ticker.C:
 				if err := db.ArchiveOldClicks(); err != nil {
-					log.Printf("Failed to archive old clicks: %v", err)
+					logger.ErrorLog("Failed to archive old clicks: %v", err)
 				}
 			}
 		}
@@ -60,7 +60,7 @@ func main() {
 	// Register routes
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		if db.Ping() != nil {
-			log.Printf("Database connection failed: %v", err)
+			logger.RequestLogger.Error(r, "Database connection failed: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Database connection failed"))
 		} else {
@@ -81,20 +81,20 @@ func main() {
 	mux.HandleFunc("GET /ads/analytics", h.GetAdsAnalytics)
 	mux.HandleFunc("GET /ads/analytics/{id}", h.GetAdAnalytics)
 
+	handler := logger.RequestLogger.LoggingMiddleware(mux)
+	handler = apihelpers.TraceMiddleware(handler)
+
 	server := &http.Server{
-		Addr: ":" + port,
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Println(r.Method, r.URL.String())
-			mux.ServeHTTP(w, r)
-		}),
+		Addr:    ":" + port,
+		Handler: handler,
 	}
 
 	// Start server in a separate goroutine
 	go func() {
-		log.Printf("⚡ Server listening on http://localhost:%s\n", port)
+		logger.LogColored(logger.ColorGreen, "⚡ Server listening on http://localhost:%s\n", port)
 		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Server failed to start: %v", err)
+			logger.FatalLog("Server failed to start: %v", err)
 		}
 	}()
 
@@ -103,8 +103,8 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Server shutting down...")
+	logger.LogColored(logger.ColorYellow, "Server shutting down...")
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server failed in graceful shutdown: %v", err)
+		logger.FatalLog("Server failed in graceful shutdown: %v", err)
 	}
 }

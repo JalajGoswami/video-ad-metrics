@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"slices"
 	"time"
 
 	apihelpers "github.com/JalajGoswami/video-ad-metrics/internal/api-helpers"
 	"github.com/JalajGoswami/video-ad-metrics/internal/database"
+	"github.com/JalajGoswami/video-ad-metrics/internal/logger"
 	"github.com/JalajGoswami/video-ad-metrics/internal/models"
 	"github.com/google/uuid"
 )
@@ -28,7 +28,7 @@ func NewHandler(db database.Repository) *Handler {
 func (h *Handler) CreateAd(w http.ResponseWriter, r *http.Request) {
 	var ad models.Ad
 	if err := json.NewDecoder(r.Body).Decode(&ad); err != nil {
-		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid request payload")
+		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 	defer r.Body.Close()
@@ -37,32 +37,35 @@ func (h *Handler) CreateAd(w http.ResponseWriter, r *http.Request) {
 	ad.CreatedAt = time.Now()
 
 	if err := h.DB.CreateAd(&ad); err != nil {
-		apihelpers.ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		logger.RequestLogger.Error(r, "Error creating ad: %v", err)
+		apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	apihelpers.SuccessResponse(w, http.StatusCreated, ad, "Ad created successfully")
+	apihelpers.SuccessResponse(r, w, http.StatusCreated, ad, "Ad created successfully")
 }
 
 // GetAd retrieves an ad by ID
 func (h *Handler) GetAd(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if uuid.Validate(id) != nil {
-		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid ad ID")
+		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid ad ID")
 		return
 	}
 
 	ad, err := h.DB.GetAd(id)
 	if err != nil {
 		if err == database.ErrNotFound {
-			apihelpers.ErrorResponse(w, http.StatusNotFound, "Ad not found")
+			logger.RequestLogger.Error(r, "Ad not found")
+			apihelpers.ErrorResponse(r, w, http.StatusNotFound, "Ad not found")
 		} else {
-			apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving ad")
+			logger.RequestLogger.Error(r, "Error retrieving ad: %v", err)
+			apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, "Error retrieving ad")
 		}
 		return
 	}
 
-	apihelpers.SuccessResponse(w, http.StatusOK, ad, "")
+	apihelpers.SuccessResponse(r, w, http.StatusOK, ad, "")
 }
 
 // ListAds returns all ads
@@ -73,7 +76,7 @@ func (h *Handler) ListAds(w http.ResponseWriter, r *http.Request) {
 	opts.Order = query.Get("order")
 	pageOpts, getPaginationObject, err := apihelpers.Pagination(r)
 	if err != nil {
-		apihelpers.ErrorResponse(w, http.StatusBadRequest, err.Error())
+		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, err.Error())
 		return
 	}
 	opts.PaginationOptions = pageOpts
@@ -81,13 +84,14 @@ func (h *Handler) ListAds(w http.ResponseWriter, r *http.Request) {
 
 	ads, err := h.DB.ListAds(opts)
 	if err != nil {
-		apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving ads")
+		logger.RequestLogger.Error(r, "Error retrieving ads: %v", err)
+		apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, "Error retrieving ads")
 		return
 	}
 	totalCount, err := h.DB.CountAds(opts)
 	if err != nil {
-		apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving ads count")
-		fmt.Println(err)
+		logger.RequestLogger.Error(r, "Error retrieving ads count: %v", err)
+		apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, "Error retrieving ads count")
 		return
 	}
 
@@ -95,21 +99,21 @@ func (h *Handler) ListAds(w http.ResponseWriter, r *http.Request) {
 		"values": ads,
 		"pages":  getPaginationObject(len(*ads), totalCount),
 	}
-	apihelpers.SuccessResponse(w, http.StatusOK, result, "")
+	apihelpers.SuccessResponse(r, w, http.StatusOK, result, "")
 }
 
 // LogClick records a click on an ad
 func (h *Handler) LogClick(w http.ResponseWriter, r *http.Request) {
 	var click models.Click
 	if err := json.NewDecoder(r.Body).Decode(&click); err != nil {
-		fmt.Println(err)
-		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid request payload")
+		logger.RequestLogger.Error(r, "Error decoding request body: %v", err)
+		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 	defer r.Body.Close()
 
 	if uuid.Validate(click.AdID) != nil {
-		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid ad ID")
+		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid ad ID")
 		return
 	}
 
@@ -126,14 +130,16 @@ func (h *Handler) LogClick(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.DB.LogClick(&click); err != nil {
 		if err == database.ErrNotFound {
-			apihelpers.ErrorResponse(w, http.StatusNotFound, "Ad not found")
+			logger.RequestLogger.Error(r, "Ad not found")
+			apihelpers.ErrorResponse(r, w, http.StatusNotFound, "Ad not found")
 		} else {
-			apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error logging click")
+			logger.RequestLogger.Error(r, "Error logging click: %v", err)
+			apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, "Error logging click")
 		}
 		return
 	}
 
-	apihelpers.SuccessResponse(w, http.StatusCreated, click, "Click logged successfully")
+	apihelpers.SuccessResponse(r, w, http.StatusCreated, click, "Click logged successfully")
 }
 
 var durationMap = map[string]time.Duration{
@@ -147,7 +153,7 @@ var durationMap = map[string]time.Duration{
 func (h *Handler) GetAdAnalytics(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if uuid.Validate(id) != nil {
-		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid ad ID")
+		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid ad ID")
 		return
 	}
 
@@ -156,7 +162,7 @@ func (h *Handler) GetAdAnalytics(w http.ResponseWriter, r *http.Request) {
 	if period == "" {
 		period = "hour"
 	} else if !slices.Contains([]string{"minute", "hour", "day", "week", "month"}, period) {
-		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid period")
+		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid period")
 		return
 	}
 
@@ -168,10 +174,11 @@ func (h *Handler) GetAdAnalytics(w http.ResponseWriter, r *http.Request) {
 	analytics, err := h.DB.GetAdAnalytics(id, startDate)
 	if err != nil {
 		if err == database.ErrNotFound {
-			apihelpers.ErrorResponse(w, http.StatusNotFound, "Ad not found")
+			logger.RequestLogger.Error(r, "Ad not found")
+			apihelpers.ErrorResponse(r, w, http.StatusNotFound, "Ad not found")
 		} else {
-			apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving analytics")
-			fmt.Println(err)
+			logger.RequestLogger.Error(r, "Error retrieving analytics: %v", err)
+			apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, "Error retrieving analytics")
 		}
 		return
 	}
@@ -184,7 +191,7 @@ func (h *Handler) GetAdAnalytics(w http.ResponseWriter, r *http.Request) {
 		analytics.AveragePlaybackTimeInRange = float64(analytics.TotalPlaybackTimeInRange) / float64(analytics.TotalClicksInRange)
 	}
 
-	apihelpers.SuccessResponse(w, http.StatusOK, analytics, "")
+	apihelpers.SuccessResponse(r, w, http.StatusOK, analytics, "")
 }
 
 // GetAdsAnalytics retrieves analytics for all ads
@@ -194,7 +201,7 @@ func (h *Handler) GetAdsAnalytics(w http.ResponseWriter, r *http.Request) {
 	if period == "" {
 		period = "hour"
 	} else if !slices.Contains([]string{"minute", "hour", "day", "week", "month"}, period) {
-		apihelpers.ErrorResponse(w, http.StatusBadRequest, "Invalid period")
+		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid period")
 		return
 	}
 
@@ -205,7 +212,8 @@ func (h *Handler) GetAdsAnalytics(w http.ResponseWriter, r *http.Request) {
 
 	analytics, err := h.DB.GetAdsAnalytics(startDate)
 	if err != nil {
-		apihelpers.ErrorResponse(w, http.StatusInternalServerError, "Error retrieving analytics")
+		logger.RequestLogger.Error(r, "Error retrieving analytics: %v", err)
+		apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, "Error retrieving analytics")
 		return
 	}
 
@@ -217,5 +225,5 @@ func (h *Handler) GetAdsAnalytics(w http.ResponseWriter, r *http.Request) {
 		analytics.AveragePlaybackTimeInRange = float64(analytics.TotalPlaybackTimeInRange) / float64(analytics.TotalClicksInRange)
 	}
 
-	apihelpers.SuccessResponse(w, http.StatusOK, analytics, "")
+	apihelpers.SuccessResponse(r, w, http.StatusOK, analytics, "")
 }

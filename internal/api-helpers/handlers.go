@@ -8,25 +8,27 @@ import (
 	"strconv"
 )
 
-func SuccessResponse(w http.ResponseWriter, status int, result any, message string) {
+func SuccessResponse(r *http.Request, w http.ResponseWriter, status int, result any, message string) {
 	if message == "" {
 		message = "Request successful"
 	}
+	traceID := GetTraceId(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(
-		map[string]any{"success": true, "message": message, "result": result},
+		map[string]any{"success": true, "trace_id": traceID, "message": message, "result": result},
 	)
 }
 
-func ErrorResponse(w http.ResponseWriter, status int, message string) {
+func ErrorResponse(r *http.Request, w http.ResponseWriter, status int, message string) {
 	if message == "" {
 		message = "Request failed unexpectedly"
 	}
+	traceID := GetTraceId(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(
-		map[string]any{"success": false, "message": message},
+		map[string]any{"success": false, "trace_id": traceID, "message": message},
 	)
 }
 
