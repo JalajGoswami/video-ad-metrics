@@ -51,7 +51,7 @@ func getLogLevelFromEnv() LogLevel {
 	case "ERROR", "error":
 		return LevelError
 	}
-	return LevelDebug
+	return LevelInfo
 }
 
 // requestLogger is a structured logger for HTTP requests

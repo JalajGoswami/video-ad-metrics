@@ -28,6 +28,7 @@ func NewHandler(db database.Repository) *Handler {
 func (h *Handler) CreateAd(w http.ResponseWriter, r *http.Request) {
 	var ad models.Ad
 	if err := json.NewDecoder(r.Body).Decode(&ad); err != nil {
+		logger.RequestLogger.Error(r, "Error decoding request body: %v", err)
 		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
@@ -38,7 +39,7 @@ func (h *Handler) CreateAd(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.DB.CreateAd(&ad); err != nil {
 		logger.RequestLogger.Error(r, "Error creating ad: %v", err)
-		apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, err.Error())
+		apihelpers.ErrorResponse(r, w, http.StatusInternalServerError, "Error creating ad")
 		return
 	}
 
@@ -49,6 +50,7 @@ func (h *Handler) CreateAd(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetAd(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if uuid.Validate(id) != nil {
+		logger.RequestLogger.Error(r, "Invalid ad ID: %v", id)
 		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid ad ID")
 		return
 	}
@@ -76,6 +78,7 @@ func (h *Handler) ListAds(w http.ResponseWriter, r *http.Request) {
 	opts.Order = query.Get("order")
 	pageOpts, getPaginationObject, err := apihelpers.Pagination(r)
 	if err != nil {
+		logger.RequestLogger.Error(r, "Error in pagination parameters: %v", err)
 		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -113,6 +116,7 @@ func (h *Handler) LogClick(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if uuid.Validate(click.AdID) != nil {
+		logger.RequestLogger.Error(r, "Invalid ad ID: %v", click.AdID)
 		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid ad ID")
 		return
 	}
@@ -153,6 +157,7 @@ var durationMap = map[string]time.Duration{
 func (h *Handler) GetAdAnalytics(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if uuid.Validate(id) != nil {
+		logger.RequestLogger.Error(r, "Invalid ad ID: %v", id)
 		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid ad ID")
 		return
 	}
@@ -162,6 +167,7 @@ func (h *Handler) GetAdAnalytics(w http.ResponseWriter, r *http.Request) {
 	if period == "" {
 		period = "hour"
 	} else if !slices.Contains([]string{"minute", "hour", "day", "week", "month"}, period) {
+		logger.RequestLogger.Error(r, "Invalid period: %v", period)
 		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid period")
 		return
 	}
@@ -201,6 +207,7 @@ func (h *Handler) GetAdsAnalytics(w http.ResponseWriter, r *http.Request) {
 	if period == "" {
 		period = "hour"
 	} else if !slices.Contains([]string{"minute", "hour", "day", "week", "month"}, period) {
+		logger.RequestLogger.Error(r, "Invalid period: %v", period)
 		apihelpers.ErrorResponse(r, w, http.StatusBadRequest, "Invalid period")
 		return
 	}
